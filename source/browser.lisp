@@ -799,11 +799,15 @@ The following example does a few things:
   (let ((buffer (current-buffer window)))
     (str:concat
      (markup:markup
-      (:b (format nil "[~{~a~^ ~}]"
-                  (mapcar (lambda (m) (str:replace-all "-mode" ""
-                                                       (str:downcase
-                                                        (class-name (class-of m)))))
-                          (modes buffer)))))
+      (:span (format nil "[~{~a~^ ~}]"
+                     (mapcar (lambda (m) (str:replace-all "-mode" ""
+                                                          (str:downcase
+                                                           (class-name (class-of m)))))
+                             (modes buffer))))
+      (:span :class "status-menu"
+             (:a :class "button" :title "Back" :href "lisp://%28nyxt%2Fweb-mode%3Ahistory-backwards%29" "←")
+             (:a :class "button" :title "Refresh" :href "lisp://%28nyxt%3Areload-current-buffer%29" "↺")
+             (:a :class "button" :title "Forwards" :href "lisp://%28nyxt%2Fweb-mode%3Ahistory-forwards%29" "→")))
      (format nil " ~a~a — ~a"
              (if (eq (slot-value buffer 'load-status) :loading)
                  "(Loading) "

@@ -33,7 +33,25 @@
                             :color "rgb(32, 32, 32)"
                             :padding 0
                             :padding-left "4px"
-                            :margin 0))))
+                            :line-height "16px"
+                            :margin 0)
+                           (.status-menu
+                            :padding-left "4px")
+                           (.button
+                            :background-color "darkgray"
+                            :color "black"
+                            :text-decoration "none"
+                            :border-radius "2px"
+                            :padding-left "2px"
+                            :padding-right "2px"
+                            :margin-left "2px"
+                            :margin-right "2px")
+                           (|.button:hover|
+                            :color "white")
+                           (|.button:visited|
+                            :color "black")
+                           (|.button:active|
+                            :color "white"))))
    (message-buffer-height :accessor message-buffer-height :initform 16
                           :type integer
                           :documentation "The height of the message buffer in pixels.")
