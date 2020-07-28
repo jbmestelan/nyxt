@@ -51,7 +51,21 @@
                            (|.button:visited|
                             :color "black")
                            (|.button:active|
-                            :color "white"))))
+                            :color "white")
+                           (.loader
+                            :border "2px solid gray"
+                            :border-top "2px solid black"
+                            :border-radius "50%"
+                            :display "inline-block"
+                            :margin-top "2px"
+                            :margin-left "3px"
+                            :margin-right "3px"
+                            :width "7px"
+                            :height "7px"
+                            :animation "spin 2s linear infinite")
+                           ("@keyframes spin"
+                            ("0%" :transform "rotate(0deg)")
+                            ("100%" :transform "rotate(360deg)")))))
    (message-buffer-height :accessor message-buffer-height :initform 16
                           :type integer
                           :documentation "The height of the message buffer in pixels.")

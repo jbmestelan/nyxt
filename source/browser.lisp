@@ -165,7 +165,6 @@ the empty string.")))
             socket-thread
             focus-on-reopened-buffer-p
             startup-function
-            start-page-url
             open-external-link-in-new-window-p
             search-engines
             download-path
@@ -180,6 +179,8 @@ the empty string.")))
             session-store-function
             session-restore-function
             session-restore-prompt
+            auto-mode-list
+            auto-mode-list-data-path
             standard-output-path
             error-output-path
             before-exit-hook
@@ -258,10 +259,10 @@ identifiers in `get-unique-buffer-identifier'.  We can't rely on the windows
 count since deleting windows may reseult in duplicate identifiers.")
    (startup-function :accessor startup-function
                      :type (or function null)
-                     :initform #'default-startup
+                     :initform (make-startup-function)
                      :documentation "The function run on startup.  It takes a
-list of URLs (strings) as argument (the command line positional arguments).  It
-is run after the renderer has been initialized and after the
+list of URLs (strings) as optional argument (the command line positional
+arguments).  It is run after the renderer has been initialized and after the
 `*after-init-hook*' has run.")
    (startup-error-reporter-function :accessor startup-error-reporter-function
                                     :initarg :startup-error-reporter-function
@@ -269,9 +270,6 @@ is run after the renderer has been initialized and after the
                                     :initform nil
                                     :documentation "When supplied, upon startup,
 if there are errors, they will be reported by this function.")
-   (start-page-url :accessor start-page-url :type quri:uri
-                   :initform (quri:uri "https://nyxt.atlas.engineer/quickstart")
-                   :documentation "The URL of the first buffer opened by Nyxt when started.")
    (open-external-link-in-new-window-p :accessor open-external-link-in-new-window-p
                                        :initform nil
                                        :documentation "When open links from an external program, or
@@ -377,6 +375,14 @@ from `session-path'.")
                            :initform :always-ask
                            :documentation "Ask whether to restore the
 session. Possible values are :always-ask :always-restore :never-restore.")
+   (auto-mode-list :accessor auto-mode-list
+                   :type list
+                   :initform '()
+                   :documentation "The auto-mode rules kept in memory.")
+   (auto-mode-list-data-path :accessor auto-mode-list-data-path
+                             :type data-path
+                             :initform (make-instance 'auto-mode-list-data-path :basename "auto-mode-list")
+                 :documentation "The path where the auto-mode rules are saved.")
    (standard-output-path :accessor standard-output-path
                          :type data-path
                          :initform (make-instance 'data-path :basename "standard-out.txt")
@@ -632,7 +638,7 @@ If none is found, fall back to `scheme:cua'."
            :type buffer
            :initform (current-buffer)
            :documentation "Buffer targetted by the request.")
-   (url :initarg :url ; TODO: Rename to URI since it's a quri:uri and not a string.
+   (url :initarg :url ; TODO: Rename to URI since it's a quri:uri and not a string?  Or leave URL everywhere, since we almost never use strings.
         :accessor url
         :type quri:uri
         :initform (quri:uri "")
@@ -763,7 +769,8 @@ The following example does a few things:
    :name name))
 
 (declaim (ftype (function (string &rest string) (function (quri:uri) boolean))
-                match-scheme match-host match-domain match-file-extension))
+                match-scheme match-host match-domain
+                match-file-extension match-regex match-url))
 (export-always 'match-scheme)
 (defun match-scheme (scheme &rest other-schemes)
   "Return a predicate for URLs matching one of SCHEME or OTHER-SCHEMES."
@@ -792,6 +799,20 @@ The following example does a few things:
       (some (alex:curry #'string= (pathname-type (or (quri:uri-path url) "")))
             (cons extension other-extensions))))
 
+(export-always 'match-regex)
+(defun match-regex (regex &rest other-regex)
+  "Return a predicate for URLs matching one of REGES or OTHER-REGEX."
+  #'(lambda (url)
+      (some (alex:rcurry #'cl-ppcre:scan (object-display url))
+            (cons regex other-regex))))
+
+(export-always 'match-url)
+(defun match-url (one-url &rest other-urls)
+  "Return a predicate for URLs exactly matching ONE-URL or OTHER-URLS."
+  #'(lambda (url)
+      (some (alex:rcurry #'string= (object-display url))
+            (cons one-url other-urls))))
+
 (defun javascript-error-handler (condition)
   (echo-warning "JavaScript error: ~a" condition))
 
@@ -799,23 +820,19 @@ The following example does a few things:
   (flet ((lisp-url (data)
            (str:concat "lisp://" (quri:url-encode data))))
     (let ((buffer (current-buffer window)))
-      (str:concat
-       (markup:markup
-        (:span (format nil "[~{~a~^ ~}]"
-                       (mapcar (lambda (m) (str:replace-all "-mode" ""
-                                                            (str:downcase
-                                                             (class-name (class-of m)))))
-                               (modes buffer))))
-        (:span :class "status-menu"
-               (:a :class "button" :title "Backwards" :href (lisp-url "(nyxt/web-mode:history-backwards)") "←")
-               (:a :class "button" :title "Reload" :href (lisp-url "(nyxt:reload-current-buffer)") "↺")
-               (:a :class "button" :title "Forwards" :href (lisp-url "(nyxt/web-mode:history-forwards)") "→")))
-       (format nil " ~a~a — ~a"
-               (if (eq (slot-value buffer 'load-status) :loading)
-                   "(Loading) "
-                   "")
-               (object-display (url buffer))
-               (title buffer))))))
+      (markup:markup
+       (:span (format nil "[~{~a~^ ~}]"
+                      (mapcar (lambda (m) (str:replace-all "-mode" "" (str:downcase (class-name (class-of m)))))
+                              (modes buffer))))
+       (:span :class "status-menu"
+              (:a :class "button" :title "Backwards" :href (lisp-url "(nyxt/web-mode:history-backwards)") "←")
+              (:a :class "button" :title "Reload" :href (lisp-url "(nyxt:reload-current-buffer)") "↺")
+              (:a :class "button" :title "Forwards" :href (lisp-url "(nyxt/web-mode:history-forwards)") "→"))
+       (:span :class (when (eq (slot-value buffer 'load-status) :loading) "loader") "")
+       (:span (if (eq (slot-value buffer 'load-status) :loading) "Loading: " ""))
+       (:span (format nil " ~a — ~a"
+                      (object-display (url buffer))
+                      (title buffer)))))))
 
 (defun print-message (message &optional window)
   (let ((window (or window (current-window))))

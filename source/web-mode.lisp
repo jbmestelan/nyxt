@@ -188,10 +188,11 @@ search.")
 (define-command paste-or-set-url (&optional (buffer (current-buffer)))
   "Paste text if active element is an input tag, forward event otherwise."
   (with-result (response (%clicked-in-input?))
-    (if (and (input-tag-p response)
-             (url-empty-p (url-at-point buffer)))
-        (funcall-safely #'paste)
-        (buffer-load (url-at-point buffer) :buffer (make-buffer-focus)))))
+    (let ((url-empty (url-empty-p (url-at-point buffer))))
+      (if (and (input-tag-p response) url-empty)
+          (funcall-safely #'paste)
+          (unless url-empty
+            (buffer-load (url-at-point buffer) :buffer (make-buffer-focus)))))))
 
 (define-command maybe-scroll-to-bottom (&optional (buffer (current-buffer)))
   "Scroll to bottom if no input element is active, forward event otherwise."
@@ -395,16 +396,16 @@ Otherwise go forward to the only child."
 
 (defmethod nyxt:on-signal-notify-uri ((mode web-mode) url)
   (declare (type quri:uri url))
-  (unless (url-empty-p url)
-    (unless (find-if (alex:rcurry #'str:starts-with? (object-string url))
-                     (history-blacklist mode))
-      (htree:add-child (make-instance 'buffer-description
-                                      :url url
-                                      :title (title (buffer mode)))
-                       (history mode)
-                       :test #'equals)
+  (unless (or (url-empty-p url)
+              (find-if (alex:rcurry #'str:starts-with? (object-string url))
+                       (history-blacklist mode)))
+    (htree:add-child (make-instance 'buffer-description
+                                    :url url
+                                    :title (title (buffer mode)))
+                     (history mode)
+                     :test #'equals)
 
-      (history-add url :title (title (buffer mode)))))
+    (history-add url :title (title (buffer mode))))
 
   (match (session-store-function *browser*)
     ((guard f f) (funcall-safely f)))
