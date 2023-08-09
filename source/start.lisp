@@ -526,8 +526,8 @@ Examples:
                       ;; Absolute path is necessary since remote process may have
                       ;; a different working directory.
                       (if remote
-                          (remote-eval (format nil "~s" `(load-lisp ,value)))
-                          (load-lisp value))))
+                          (remote-eval (format nil "~s" `(load-lisp ,(truename value))))
+                          (load-lisp (truename value)))))
              (:eval (if remote
                         (remote-eval value)
                         (eval-expr value)))))
