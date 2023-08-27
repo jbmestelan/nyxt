@@ -55,8 +55,10 @@ For the actual uses and configuration of search engines, see:
   (fallback-url object))
 
 (defmethod fallback-url ((engine search-engine))
-  (or (slot-value engine 'fallback-url)
-      (quri:uri (format nil (search-url engine) ""))))
+  (let ((fallback (slot-value engine 'fallback-url)))
+    (if (or (not fallback) (string= fallback ""))
+        (quri:uri (format nil (search-url engine) ""))
+        fallback)))
 
 (export-always 'make-search-engine)
 (defun make-search-engine (shortcut search-url &optional fallback-url)
@@ -66,7 +68,7 @@ values of respective arguments."
   (make-instance 'search-engine
                  :shortcut shortcut
                  :search-url search-url
-                 :fallback-url (ensure-url fallback-url)))
+                 :fallback-url (if (string= fallback-url "") nil (ensure-url fallback-url))))
 
 (export-always 'make-search-completion-function)
 (-> make-search-completion-function
