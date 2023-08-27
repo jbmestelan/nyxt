@@ -253,7 +253,10 @@ validation may take significant time since it looks up the DNS."
                ;; unless it's found on the local network.  We also need to
                ;; support "localhost" and the current system hostname.
                (or (quri:ip-addr-p (quri:uri-host url))
-                   (lookup-hostname (quri:uri-host url)))))))))
+                   (lookup-hostname (quri:uri-host url))))
+             ;; Check if the URL is a `search-url` with an empty string.
+             (and (string= (quri:uri-scheme url) "search")
+                  (string= (quri:uri-query url) ""))))))
 
 (-> ensure-url (t) quri:uri)
 (export-always 'ensure-url)
